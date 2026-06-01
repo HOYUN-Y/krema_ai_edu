@@ -3,5 +3,11 @@
   "framework": "nextjs",
   "regions": ["icn1"],
   "buildCommand": "next build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "0 17 * * *"
+    }
+  ]
 }
