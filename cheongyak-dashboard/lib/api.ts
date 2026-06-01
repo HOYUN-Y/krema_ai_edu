@@ -27,21 +27,37 @@ async function fetchApi(path: string, params: Record<string, string> = {}) {
     ...params,
   });
   const url = `${BASE_URL}${path}?${qs.toString()}`;
-  const res = await fetch(url, { next: { revalidate: 3600 } });
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`API error: ${res.status} (${url})`);
   return res.json();
 }
 
 // ── API 1: 분양정보 ────────────────────────────────────────────
 
-/** APT 분양정보 상세조회 */
-export async function getAPTAnnouncements(page = "1", perPage = "20") {
-  const data = await fetchApi("/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail", {
-    page, perPage,
-  });
+export type FilterType = "전체" | "수도권" | "민영";
+
+// 수도권 지역명
+const SUDOGWON_NAMES = ["서울", "경기", "인천"];
+
+function applyFilter(items: Record<string, string | number>[], filter: FilterType) {
+  if (filter === "수도권") {
+    return items.filter(i => SUDOGWON_NAMES.includes(String(i.SUBSCRPT_AREA_CODE_NM ?? "")));
+  }
+  if (filter === "민영") {
+    return items.filter(i => String(i.HOUSE_DTL_SECD ?? "") === "01" || String(i.HOUSE_DTL_SECD_NM ?? "") === "민영");
+  }
+  return items;
+}
+
+/** APT 분양정보 상세조회 — 필터 지원 */
+export async function getAPTAnnouncements(page = "1", perPage = "20", filter: FilterType = "전체") {
+  const data = await fetchApi("/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail", { page, perPage });
+  const allItems = (data?.data ?? []) as Record<string, string | number>[];
+  const items = applyFilter(allItems, filter);
   return {
     totalCount: data?.totalCount ?? 0,
-    items: (data?.data ?? []) as Record<string, string | number>[],
+    filteredCount: items.length,
+    items,
   };
 }
 
@@ -56,14 +72,17 @@ export async function getAPTHouseTypes(houseManageNo: string) {
 
 // ── API 2: 경쟁률 ──────────────────────────────────────────────
 
-/** APT 분양정보/경쟁률 조회 */
-export async function getAPTCompetition(page = "1", houseManageNo?: string) {
+/** APT 분양정보/경쟁률 조회 — 필터 지원 */
+export async function getAPTCompetition(page = "1", houseManageNo?: string, filter: FilterType = "전체") {
   const params: Record<string, string> = { page, perPage: "20" };
   if (houseManageNo) params["cond[HOUSE_MANAGE_NO::EQ]"] = houseManageNo;
   const data = await fetchApi("/ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancCmpet", params);
+  const allItems = (data?.data ?? []) as Record<string, string | number>[];
+  const items = applyFilter(allItems, filter);
   return {
     totalCount: data?.totalCount ?? 0,
-    items: (data?.data ?? []) as Record<string, string | number>[],
+    filteredCount: items.length,
+    items,
   };
 }
 

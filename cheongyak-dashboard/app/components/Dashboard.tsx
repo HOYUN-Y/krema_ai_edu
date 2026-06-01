@@ -31,14 +31,19 @@ type Item = Record<string, string | number>;
 
 export default function Dashboard() {
   const [activePage, setActivePage] = useState<NavKey>("대시보드");
-  const [filter, setFilter] = useState("전체");
+  const [filter, setFilter] = useState<"전체" | "수도권" | "민영">("전체");
 
-  const { data: annData } = useSWR("/api/announcements?page=1", fetcher);
-  const { data: cmpData } = useSWR("/api/competition", fetcher);
+  const { data: annData, isLoading: annLoading } = useSWR(
+    `/api/announcements?page=1&filter=${encodeURIComponent(filter)}`, fetcher
+  );
+  const { data: cmpData } = useSWR(
+    `/api/competition?filter=${encodeURIComponent(filter)}`, fetcher
+  );
   const { data: statData } = useSWR("/api/applicants", fetcher);
 
   const announcements: Item[] = annData?.items ?? [];
   const totalCount: number = annData?.totalCount ?? 0;
+  const filteredCount: number = annData?.filteredCount ?? totalCount;
   const compItems: Item[] = cmpData?.competition?.items ?? [];
   const statItems: Item[] = statData?.reqst?.items ?? [];
 
@@ -135,9 +140,19 @@ export default function Dashboard() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {["전체", "수도권", "민영"].map((label) => (
+            {(["전체", "수도권", "민영"] as const).map((label) => (
               <Chip key={label} label={label} active={filter === label} onClick={() => setFilter(label)} />
             ))}
+            {annLoading && (
+              <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>로딩 중…</span>
+            )}
+            {!annLoading && totalCount > 0 && (
+              <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>
+                {filter === "전체"
+                  ? `전체 ${totalCount.toLocaleString()}건`
+                  : `${filteredCount}건 / 전체 ${totalCount.toLocaleString()}건`}
+              </span>
+            )}
           </div>
         </header>
 

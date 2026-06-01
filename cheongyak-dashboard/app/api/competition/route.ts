@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAPTCompetition, getSpecialSupply } from "@/lib/api";
+import { getAPTCompetition, getSpecialSupply, FilterType } from "@/lib/api";
 
 export async function GET(req: NextRequest) {
   try {
     const page = req.nextUrl.searchParams.get("page") ?? "1";
     const houseManageNo = req.nextUrl.searchParams.get("id") ?? undefined;
+    const filter = (req.nextUrl.searchParams.get("filter") ?? "전체") as FilterType;
     const [competition, special] = await Promise.all([
-      getAPTCompetition(page, houseManageNo),
+      getAPTCompetition(page, houseManageNo, filter),
       getSpecialSupply(page),
     ]);
     return NextResponse.json({ competition, special });
