@@ -1,0 +1,12 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getAnnouncements } from "@/lib/api";
+
+export async function GET(req: NextRequest) {
+  try {
+    const page = req.nextUrl.searchParams.get("page") ?? "1";
+    const data = await getAnnouncements(page);
+    return NextResponse.json(data);
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
+}
