@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/lyuhoyun/Documents/GitHub/krema_claude_practice/time1/.claude)"
+    ]
+  }
+}
