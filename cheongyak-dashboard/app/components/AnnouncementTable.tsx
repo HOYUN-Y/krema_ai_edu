@@ -24,13 +24,13 @@ export default function AnnouncementTable() {
     <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="px-6 py-4 border-b flex items-center justify-between">
         <h2 className="font-semibold text-lg">📋 분양 공고 목록</h2>
-        <span className="text-sm text-gray-500">총 {total.toLocaleString()}건</span>
+        <span className="text-sm text-gray-500">총 {Number(total).toLocaleString()}건</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600">
             <tr>
-              {["단지명", "지역", "공급규모", "청약접수 시작일", "청약접수 종료일", "당첨자 발표일"].map((h) => (
+              {["주택명", "공급지역", "공급규모", "청약접수 시작일", "청약접수 종료일", "당첨자 발표일"].map((h) => (
                 <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -40,12 +40,12 @@ export default function AnnouncementTable() {
               <tr><td colSpan={6} className="text-center py-10 text-gray-400">데이터가 없습니다</td></tr>
             ) : items.map((item, i) => (
               <tr key={i} className="hover:bg-blue-50 transition-colors">
-                <td className="px-4 py-3 font-medium text-brand-700">{item.houseNm ?? "-"}</td>
-                <td className="px-4 py-3">{item.sido ?? "-"} {item.gugun ?? ""}</td>
-                <td className="px-4 py-3 text-right">{item.totSuplyHshldco ? Number(item.totSuplyHshldco).toLocaleString() + "세대" : "-"}</td>
-                <td className="px-4 py-3">{item.rceptBgnde ?? "-"}</td>
-                <td className="px-4 py-3">{item.rceptEndde ?? "-"}</td>
-                <td className="px-4 py-3">{item.przwnerPresnatnDe ?? "-"}</td>
+                <td className="px-4 py-3 font-medium text-brand-700">{item.HOUSE_NM ?? "-"}</td>
+                <td className="px-4 py-3">{item.SUBSCRPT_AREA_CODE_NM ?? "-"}</td>
+                <td className="px-4 py-3 text-right">{item.TOT_SUPLY_HSHLDCO ? Number(item.TOT_SUPLY_HSHLDCO).toLocaleString() + "세대" : "-"}</td>
+                <td className="px-4 py-3">{item.RCEPT_BGNDE ?? item.GNRL_RNK1_CRSPAREA_RCPTDE ?? "-"}</td>
+                <td className="px-4 py-3">{item.RCEPT_ENDDE ?? item.GNRL_RNK1_CRSPAREA_ENDDE ?? "-"}</td>
+                <td className="px-4 py-3">{item.PRZWNER_PRESNATN_DE ?? item.CNTRCT_CNCLS_BGNDE ?? "-"}</td>
               </tr>
             ))}
           </tbody>
