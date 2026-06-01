@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAPTCompetition, getSpecialSupply, FilterType } from "@/lib/api";
+import { getCompetitionFromDB } from "@/lib/sync";
+import { getSpecialSupply } from "@/lib/api";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const page = req.nextUrl.searchParams.get("page") ?? "1";
-    const houseManageNo = req.nextUrl.searchParams.get("id") ?? undefined;
-    const filter = (req.nextUrl.searchParams.get("filter") ?? "전체") as FilterType;
+    const sp = req.nextUrl.searchParams;
+    const page   = Number(sp.get("page") ?? 1);
+    const filter = sp.get("filter") ?? "전체";
+
     const [competition, special] = await Promise.all([
-      getAPTCompetition(page, houseManageNo, filter),
-      getSpecialSupply(page),
+      getCompetitionFromDB(filter, page),
+      getSpecialSupply(),
     ]);
+
     return NextResponse.json({ competition, special });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });

@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getReqstAreaStat, getPrzwnerAreaStat } from "@/lib/api";
+import { NextResponse } from "next/server";
+import { getStatsFromDB } from "@/lib/sync";
 
-export async function GET(req: NextRequest) {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET() {
   try {
-    const page = req.nextUrl.searchParams.get("page") ?? "1";
-    const [reqst, przwner] = await Promise.all([
-      getReqstAreaStat(page),
-      getPrzwnerAreaStat(page),
-    ]);
-    return NextResponse.json({ reqst, przwner });
+    const data = await getStatsFromDB();
+    return NextResponse.json(data);
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
