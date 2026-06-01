@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
 import useSWR from "swr";
-import { Card, KpiCard, Logo, Chip, StatusPill, heatColor, fmt } from "./ui";
-import { HBarRank, AreaLine, Donut } from "./charts";
+import { parseAsString, parseAsStringEnum, useQueryState } from "nuqs";
+import { Card, KpiCard, Logo, Chip, StatusPill, fmt } from "./ui";
+import DonutChart from "./charts/DonutChart";
+import BarChart from "./charts/BarChart";
+import LineChart from "./charts/LineChart";
 import CompetitionPage from "./pages/CompetitionPage";
 import RegionPage from "./pages/RegionPage";
 import SchedulePage from "./pages/SchedulePage";
@@ -30,8 +33,16 @@ const SUPPLY_TYPES = [
 type Item = Record<string, string | number>;
 
 export default function Dashboard() {
-  const [activePage, setActivePage] = useState<NavKey>("대시보드");
-  const [filter, setFilter] = useState<"전체" | "수도권" | "민영">("전체");
+  // nuqs: URL ↔ 상태 동기화 (뒤로가기·공유·북마크 지원)
+  const [activePage, setActivePage] = useQueryState(
+    "page",
+    parseAsStringEnum<NavKey>(["대시보드", "경쟁률 분석", "분양가·시세", "지역 현황", "청약 일정"])
+      .withDefault("대시보드")
+  );
+  const [filter, setFilter] = useQueryState(
+    "filter",
+    parseAsStringEnum(["전체", "수도권", "민영"]).withDefault("전체")
+  );
 
   const { data: annData, isLoading: annLoading } = useSWR(
     `/api/announcements?page=1&filter=${encodeURIComponent(filter)}`, fetcher
@@ -172,14 +183,24 @@ export default function Dashboard() {
               {/* Row 2: 경쟁률 랭킹 + 추이 */}
               <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 18 }}>
                 <Card title="경쟁률 TOP 8" sub="공고번호별 1순위 최고 경쟁률 · 색상 = 과열 정도">
-                  {ranked.length > 0
-                    ? <HBarRank data={ranked} labelKey="name" subKey="area" valueKey="rate" />
-                    : <div style={{ height: 200, background: "var(--track)", borderRadius: 8, animation: "pulse 1.5s ease-in-out infinite" }} />}
+                  <Suspense fallback={<div style={{ height: 240, background: "var(--track)", borderRadius: 8 }} />}>
+                    <BarChart
+                      data={ranked.map(r => ({ name: r.name, value: r.rate }))}
+                      unit=":1"
+                      height={240}
+                      colorScale
+                    />
+                  </Suspense>
                 </Card>
                 <Card title="월별 신청 추이" sub="지역별 연령대 신청건수 합계">
-                  {trend.length > 0
-                    ? <AreaLine data={trend} valueKey="rate" color="#2563EB" />
-                    : <div style={{ height: 180, background: "var(--track)", borderRadius: 8 }} />}
+                  <Suspense fallback={<div style={{ height: 200, background: "var(--track)", borderRadius: 8 }} />}>
+                    <LineChart
+                      data={trend.map(t => ({ month: t.month, value: t.rate }))}
+                      color="#2563EB"
+                      height={200}
+                      unit="건"
+                    />
+                  </Suspense>
                 </Card>
               </div>
 
@@ -225,11 +246,14 @@ export default function Dashboard() {
                 </Card>
 
                 <Card title="공급 유형 구성" sub="주택구분 기준 (참고용)">
-                  <Donut
-                    data={SUPPLY_TYPES}
-                    centerValue={matchCount ? String(matchCount > 9999 ? "9999+" : matchCount) : "…"}
-                    centerLabel="공고건"
-                  />
+                  <Suspense fallback={<div style={{ height: 200, background: "var(--track)", borderRadius: 8 }} />}>
+                    <DonutChart
+                      data={SUPPLY_TYPES.map(s => ({ label: s.label, value: s.value, color: s.color }))}
+                      centerValue={matchCount ? String(matchCount > 9999 ? "9999+" : matchCount) : "…"}
+                      centerLabel="공고건"
+                      height={200}
+                    />
+                  </Suspense>
                   <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--bg)", borderRadius: 10 }}>
                     <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600, marginBottom: 6 }}>지역별 신청 현황 (최근)</div>
                     {statItems.slice(0, 5).map((item, i) => (

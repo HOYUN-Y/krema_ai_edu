@@ -2,12 +2,16 @@
 
 import useSWR from "swr";
 import { useState } from "react";
-import { heatColor, fmt } from "../ui";
-import { AreaLine } from "../charts";
+import { Card } from "../ui";
+import KoreaMap from "../charts/KoreaMap";
+import BarChart from "../charts/BarChart";
+import LineChart from "../charts/LineChart";
+import StackedBarChart from "../charts/StackedBarChart";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-// 지역 타일 좌표 (행정구역 근사 배치)
+type Item = Record<string, string | number>;
+
 const REGION_TILES: { code: string; name: string; tile: [number, number] }[] = [
   { code: "강원", name: "강원", tile: [4, 0] },
   { code: "인천", name: "인천", tile: [1, 1] },
@@ -28,7 +32,6 @@ const REGION_TILES: { code: string; name: string; tile: [number, number] }[] = [
   { code: "제주", name: "제주", tile: [1, 5] },
 ];
 
-// 공급지역명 → 타일 코드 매핑
 const NAME_TO_CODE: Record<string, string> = {
   "서울": "서울", "경기": "경기", "인천": "인천", "강원": "강원",
   "충북": "충북", "세종": "세종", "충남": "충남", "대전": "대전",
@@ -36,26 +39,11 @@ const NAME_TO_CODE: Record<string, string> = {
   "광주": "광주", "전남": "전남", "경남": "경남", "부산": "부산", "제주": "제주",
 };
 
-type Item = Record<string, string | number>;
 type RegionStat = {
   code: string; name: string;
   totalReqst: number; totalPrz: number;
   age30: number; age40: number; age50: number; age60: number;
 };
-
-const HEAT_LEGEND = [
-  ["#DBEAFE", "~100"], ["#93C5FD", "~500"], ["#FCD34D", "~1K"],
-  ["#FB923C", "~5K"], ["#F97316", "~20K"], ["#DC2626", "20K+"],
-];
-
-function reqstHeatColor(val: number): string {
-  if (val >= 20000) return "#DC2626";
-  if (val >= 5000)  return "#F97316";
-  if (val >= 1000)  return "#FB923C";
-  if (val >= 500)   return "#FCD34D";
-  if (val >= 100)   return "#93C5FD";
-  return "#DBEAFE";
-}
 
 export default function RegionPage() {
   const { data: statData, isLoading } = useSWR("/api/applicants", fetcher);
@@ -63,9 +51,8 @@ export default function RegionPage() {
   const [selected, setSelected] = useState<string>("서울");
 
   const reqstItems: Item[] = statData?.reqst?.items ?? [];
-  const przItems: Item[] = statData?.przwner?.items ?? [];
+  const przItems: Item[]   = statData?.przwner?.items ?? [];
 
-  // 지역별 최신 데이터 집계
   const latestDate = [...reqstItems]
     .sort((a, b) => String(b.STAT_DE).localeCompare(String(a.STAT_DE)))[0]?.STAT_DE ?? "";
 
@@ -73,10 +60,8 @@ export default function RegionPage() {
   REGION_TILES.forEach(r => {
     regionStats[r.code] = { code: r.code, name: r.name, totalReqst: 0, totalPrz: 0, age30: 0, age40: 0, age50: 0, age60: 0 };
   });
-
   reqstItems.filter(i => i.STAT_DE === latestDate).forEach(i => {
-    const nm = String(i.SUBSCRPT_AREA_CODE_NM ?? "");
-    const code = NAME_TO_CODE[nm];
+    const code = NAME_TO_CODE[String(i.SUBSCRPT_AREA_CODE_NM ?? "")];
     if (code && regionStats[code]) {
       regionStats[code].age30 += Number(i.AGE_30 ?? 0);
       regionStats[code].age40 += Number(i.AGE_40 ?? 0);
@@ -86,8 +71,7 @@ export default function RegionPage() {
     }
   });
   przItems.filter(i => i.STAT_DE === latestDate).forEach(i => {
-    const nm = String(i.SUBSCRPT_AREA_CODE_NM ?? "");
-    const code = NAME_TO_CODE[nm];
+    const code = NAME_TO_CODE[String(i.SUBSCRPT_AREA_CODE_NM ?? "")];
     if (code && regionStats[code]) {
       regionStats[code].totalPrz += Number(i.AGE_30 ?? 0) + Number(i.AGE_40 ?? 0) + Number(i.AGE_50 ?? 0) + Number(i.AGE_60 ?? 0);
     }
@@ -105,32 +89,43 @@ export default function RegionPage() {
   const trend = Object.entries(monthMap)
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-8)
-    .map(([month, rate]) => ({ month, rate }));
+    .map(([month, value]) => ({ month, value }));
 
-  // 지역 랭킹
-  const ranking = Object.values(regionStats)
+  // KoreaMap 데이터
+  const mapData = Object.values(regionStats).map(r => ({
+    name: r.name,
+    value: metric === "reqst" ? r.totalReqst : r.totalPrz,
+  }));
+
+  // 지역 랭킹 (바 차트용)
+  const rankingData = Object.values(regionStats)
     .sort((a, b) => b.totalReqst - a.totalReqst)
-    .slice(0, 8);
+    .slice(0, 8)
+    .map(r => ({ name: r.name, value: r.totalReqst }));
 
+  // 선택 지역
   const sel = regionStats[selected] ?? regionStats["서울"];
+
+  // 연령대 스택 바 차트
+  const ageCategories = ["30대 이하", "40대", "50대", "60대 이상"];
+  const ageData = [sel.age30, sel.age40, sel.age50, sel.age60];
+
   const statMonth = String(latestDate).length === 6
     ? `${String(latestDate).slice(0, 4)}년 ${String(latestDate).slice(4)}월`
     : String(latestDate);
 
-  // 타일맵 렌더
-  const cell = 52, gap = 6;
-  const cols = Math.max(...REGION_TILES.map(r => r.tile[0])) + 1;
-  const rows = Math.max(...REGION_TILES.map(r => r.tile[1])) + 1;
-  const mapW = cols * (cell + gap);
-  const mapH = rows * (cell + gap);
+  const totalReqst = Object.values(regionStats).reduce((s, r) => s + r.totalReqst, 0);
+  const totalPrz   = Object.values(regionStats).reduce((s, r) => s + r.totalPrz, 0);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {/* 서브 헤더 */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {/* 헤더 */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>지역 현황</h2>
-          <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 0" }}>기준월: {statMonth} · 지역 타일을 클릭하면 상세 현황이 표시됩니다</p>
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 0" }}>
+            기준월: {statMonth} · 지역을 클릭하면 상세 현황이 표시됩니다
+          </p>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>지표</span>
@@ -145,169 +140,125 @@ export default function RegionPage() {
         </div>
       </div>
 
-      {/* 메인 2컬럼 */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 400px", gap: 18 }}>
-        {/* 좌: 타일맵 + 추이 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          {/* 타일맵 카드 */}
-          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, boxShadow: "var(--shadow)", padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 14.5, fontWeight: 700 }}>전국 청약 히트맵</div>
-                <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>
-                  {metric === "reqst" ? "청약 신청건수" : "당첨건수"} 기준 · 색상 = 규모
-                </div>
-              </div>
-              {/* 범례 */}
-              <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-                {HEAT_LEGEND.map(([c, l], i) => (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                    <span style={{ width: 28, height: 9, background: c, display: "block",
-                      borderRadius: i === 0 ? "3px 0 0 3px" : i === HEAT_LEGEND.length - 1 ? "0 3px 3px 0" : 0 }} />
-                    <span style={{ fontSize: 9, color: "var(--muted)" }}>{l}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {isLoading
-              ? <div style={{ height: mapH + 40, background: "var(--track)", borderRadius: 10, animation: "pulse 1.5s ease-in-out infinite" }} />
-              : (
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                  <div style={{ position: "relative", width: mapW, height: mapH }}>
-                    {REGION_TILES.map((r) => {
-                      const stat = regionStats[r.code];
-                      const val = metric === "reqst" ? stat.totalReqst : stat.totalPrz;
-                      const isSelected = selected === r.code;
-                      const color = reqstHeatColor(val);
-                      const isHot = val >= 1000;
-                      return (
-                        <div key={r.code}
-                          onClick={() => setSelected(r.code)}
-                          style={{
-                            position: "absolute",
-                            left: r.tile[0] * (cell + gap),
-                            top: r.tile[1] * (cell + gap),
-                            width: cell, height: cell,
-                            borderRadius: 10,
-                            background: color,
-                            display: "flex", flexDirection: "column",
-                            alignItems: "center", justifyContent: "center",
-                            cursor: "pointer",
-                            transform: isSelected ? "scale(1.1)" : "scale(1)",
-                            transition: "transform .15s, box-shadow .15s",
-                            boxShadow: isSelected ? "0 6px 20px rgba(15,23,42,.25)" : "none",
-                            outline: isSelected ? "2.5px solid var(--ink)" : "none",
-                            zIndex: isSelected ? 5 : 1,
-                          }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: isHot ? "#fff" : "var(--ink)" }}>{r.name}</div>
-                          <div style={{ fontSize: 9.5, fontWeight: 600, color: isHot ? "rgba(255,255,255,.85)" : "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
-                            {val > 0 ? val.toLocaleString() : "-"}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-          </div>
-
-          {/* 월별 추이 */}
-          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, boxShadow: "var(--shadow)", padding: 18 }}>
-            <div style={{ fontSize: 14.5, fontWeight: 700, marginBottom: 2 }}>전국 월별 신청 추이</div>
-            <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 12 }}>전국 합산 신청건수</div>
-            {trend.length > 0
-              ? <AreaLine data={trend} valueKey="rate" color="#2563EB" />
-              : <div style={{ height: 140, background: "var(--track)", borderRadius: 8 }} />}
-          </div>
-        </div>
-
-        {/* 우: 지역 상세 패널 */}
-        <aside style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, boxShadow: "var(--shadow)", padding: 22, display: "flex", flexDirection: "column", gap: 18 }}>
-          {/* 선택 지역 헤더 */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 14, height: 14, borderRadius: 4, background: reqstHeatColor(sel.totalReqst), display: "inline-block" }} />
-              <h3 style={{ fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>{sel.name}</h3>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-              <div style={{ background: "var(--bg)", borderRadius: 12, padding: 14 }}>
-                <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>총 신청건수</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "#2563EB", fontVariantNumeric: "tabular-nums", marginTop: 4 }}>
-                  {sel.totalReqst.toLocaleString()}
-                  <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500, marginLeft: 2 }}>건</span>
-                </div>
-              </div>
-              <div style={{ background: "var(--bg)", borderRadius: 12, padding: 14 }}>
-                <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>총 당첨건수</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: "#059669", fontVariantNumeric: "tabular-nums", marginTop: 4 }}>
-                  {sel.totalPrz.toLocaleString()}
-                  <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 500, marginLeft: 2 }}>건</span>
-                </div>
-              </div>
-            </div>
-            {/* 당첨률 */}
-            <div style={{ marginTop: 10, padding: "10px 14px", background: "var(--bg)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--muted)" }}>당첨률</span>
-              <span style={{ fontSize: 18, fontWeight: 800, color: "#F59E0B", fontVariantNumeric: "tabular-nums" }}>
-                {sel.totalReqst > 0 ? ((sel.totalPrz / sel.totalReqst) * 100).toFixed(2) : "-"}%
-              </span>
+      {/* KPI */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+        {[
+          { label: "총 신청건수", value: totalReqst.toLocaleString(), unit: "건", color: "#2563EB" },
+          { label: "총 당첨건수", value: totalPrz.toLocaleString(), unit: "건", color: "#059669" },
+          { label: "당첨률", value: totalReqst > 0 ? ((totalPrz / totalReqst) * 100).toFixed(2) : "-", unit: "%", color: "#F59E0B" },
+        ].map(k => (
+          <div key={k.label} style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, padding: 16, boxShadow: "var(--shadow)" }}>
+            <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>{k.label}</div>
+            <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 4 }}>
+              <span style={{ fontSize: 26, fontWeight: 800, color: k.color, fontVariantNumeric: "tabular-nums" }}>{k.value}</span>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>{k.unit}</span>
             </div>
           </div>
+        ))}
+      </div>
 
-          {/* 연령대 분포 */}
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>연령대별 신청 분포</div>
-            {[
-              { label: "30대 이하", value: sel.age30, color: "#3B82F6" },
-              { label: "40대", value: sel.age40, color: "#10B981" },
-              { label: "50대", value: sel.age50, color: "#F59E0B" },
-              { label: "60대 이상", value: sel.age60, color: "#EF4444" },
-            ].map((a) => {
-              const total = sel.age30 + sel.age40 + sel.age50 + sel.age60 || 1;
-              const pct = (a.value / total * 100).toFixed(1);
-              return (
-                <div key={a.label} style={{ display: "grid", gridTemplateColumns: "70px 1fr 50px", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>{a.label}</span>
-                  <div style={{ background: "var(--track)", borderRadius: 4, height: 18, overflow: "hidden" }}>
-                    <div style={{ width: pct + "%", height: "100%", background: a.color, borderRadius: 4, transition: "width .5s" }} />
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{pct}%</span>
+      {/* 메인 2컬럼: 코로플레스 지도 + 우측 패널 */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 18 }}>
+        {/* 좌: 한국 코로플레스 지도 */}
+        <Card title="전국 청약 히트맵" sub={`${metric === "reqst" ? "신청건수" : "당첨건수"} 기준 · 지역 클릭 시 상세 표시`}>
+          {isLoading
+            ? <div style={{ height: 400, background: "var(--track)", borderRadius: 8, animation: "pulse 1.5s ease-in-out infinite" }} />
+            : <KoreaMap data={mapData} onSelect={setSelected} selected={selected} height={400} />}
+        </Card>
+
+        {/* 우: 선택 지역 상세 */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* 선택 지역 KPI */}
+          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, padding: 18, boxShadow: "var(--shadow)" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12, letterSpacing: "-0.02em" }}>
+              📍 {sel.name}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              {[
+                { label: "신청건수", value: sel.totalReqst.toLocaleString(), color: "#2563EB" },
+                { label: "당첨건수", value: sel.totalPrz.toLocaleString(), color: "#059669" },
+                { label: "당첨률", value: sel.totalReqst > 0 ? ((sel.totalPrz / sel.totalReqst) * 100).toFixed(1) + "%" : "-", color: "#F59E0B" },
+              ].map(k => (
+                <div key={k.label} style={{ background: "var(--bg)", borderRadius: 10, padding: 12, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "var(--muted)", fontWeight: 600 }}>{k.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: k.color, marginTop: 4 }}>{k.value}</div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* 연령대 스택 바 */}
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6 }}>연령대별 신청 분포</div>
+              <StackedBarChart
+                categories={ageCategories}
+                series={[{
+                  name: "신청건수",
+                  data: ageData,
+                  color: "#3B82F6",
+                }]}
+                height={130}
+                horizontal={false}
+              />
+            </div>
           </div>
 
           {/* 지역 랭킹 */}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>지역별 신청건수 랭킹</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {ranking.map((r, i) => {
-                const maxVal = ranking[0].totalReqst || 1;
-                const w = (r.totalReqst / maxVal * 100);
-                const isSelected = r.code === selected;
-                return (
-                  <div key={r.code} onClick={() => setSelected(r.code)} style={{
-                    display: "grid", gridTemplateColumns: "20px 60px 1fr 70px",
-                    alignItems: "center", gap: 8, cursor: "pointer",
-                    padding: "4px 6px", borderRadius: 7,
-                    background: isSelected ? "#EFF6FF" : "transparent",
-                  }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: i < 3 ? "#1D4ED8" : "var(--muted)", textAlign: "center" }}>{i + 1}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>{r.name}</span>
-                    <div style={{ background: "var(--track)", borderRadius: 4, height: 16, overflow: "hidden" }}>
-                      <div style={{ width: w + "%", height: "100%", background: reqstHeatColor(r.totalReqst), borderRadius: 4 }} />
-                    </div>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--muted)" }}>
-                      {r.totalReqst.toLocaleString()}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <Card title="지역별 신청건수 TOP 8" sub="클릭하면 지도에서 선택">
+            <BarChart
+              data={rankingData}
+              unit="건"
+              height={220}
+            />
+          </Card>
         </aside>
       </div>
+
+      {/* 월별 추이 */}
+      <Card title="전국 월별 신청 추이" sub="전국 합산 신청건수">
+        <LineChart data={trend} color="#2563EB" unit="건" height={180} />
+      </Card>
+
+      {/* 월별 테이블 */}
+      <Card title="전국 월별 신청·당첨 현황" sub="기준월별 합산">
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", fontSize: 12.5, borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["기준월", "총 신청건수", "총 당첨건수", "당첨률"].map(h => (
+                  <th key={h} style={{ padding: "8px 12px", textAlign: h === "기준월" ? "left" : "right", fontWeight: 700, color: "var(--muted)", fontSize: 11, borderBottom: "1px solid var(--line)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(monthMap)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .slice(-12)
+                .map(([month, reqst], i) => {
+                  const przMonth = (() => {
+                    const raw = Object.entries(
+                      przItems.reduce((acc: Record<string, number>, item) => {
+                        const m = String(item.STAT_DE ?? "");
+                        const label = m.slice(4) + "월";
+                        acc[label] = (acc[label] ?? 0) + Number(item.AGE_30 ?? 0) + Number(item.AGE_40 ?? 0) + Number(item.AGE_50 ?? 0) + Number(item.AGE_60 ?? 0);
+                        return acc;
+                      }, {})
+                    ).find(([k]) => k === month);
+                    return raw ? raw[1] : 0;
+                  })();
+                  const rate = reqst > 0 ? ((przMonth / reqst) * 100).toFixed(2) : "-";
+                  return (
+                    <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                      <td style={{ padding: "10px 12px", fontWeight: 600 }}>{month}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#2563EB", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{reqst.toLocaleString()}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: "#059669", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{przMonth.toLocaleString()}</td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>{rate}%</td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
