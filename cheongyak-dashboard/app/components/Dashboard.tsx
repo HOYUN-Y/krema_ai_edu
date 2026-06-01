@@ -43,7 +43,9 @@ export default function Dashboard() {
 
   const announcements: Item[] = annData?.items ?? [];
   const totalCount: number = annData?.totalCount ?? 0;
-  const filteredCount: number = annData?.filteredCount ?? totalCount;
+  // ★ matchCount: 실제 필터 적용 결과 수 (totalCount는 필터 무관한 전체 크기라 사용 X)
+  const matchCount: number = annData?.matchCount ?? totalCount;
+  const filteredCount: number = annData?.filteredCount ?? matchCount;
   const compItems: Item[] = cmpData?.competition?.items ?? [];
   const statItems: Item[] = statData?.reqst?.items ?? [];
 
@@ -83,7 +85,7 @@ export default function Dashboard() {
   const avgRate = validRates.length > 0 ? (validRates.reduce((a, b) => a + b, 0) / validRates.length).toFixed(1) : "-";
 
   const kpis = [
-    { label: "분양 공고 건수", value: totalCount ? totalCount.toLocaleString() : "…", unit: "건", delta: 12.4, sub: "전체 누적", spark: [60, 70, 80, 90, 100, 110, 120] },
+    { label: "분양 공고 건수", value: matchCount ? matchCount.toLocaleString() : "…", unit: "건", delta: 12.4, sub: filter === "전체" ? "전체 누적" : filter + " 필터", spark: [60, 70, 80, 90, 100, 110, 120] },
     { label: "평균 경쟁률", value: avgRate, unit: ":1", delta: 14.2, sub: "조회 기준", sparkColor: "#F97316", spark: trend.slice(-7).map(t => t.rate || 1) },
     { label: "총 공급 세대", value: totalSupply ? totalSupply.toLocaleString() : "…", unit: "세대", delta: 6.8, sub: "조회 기준", sparkColor: "#0D9488", spark: [2000, 3000, 2500, 4000, 3800, 5000, totalSupply / 100 || 1] },
     { label: "연동 API", value: "3", unit: "개", delta: 0, sub: "실시간 연동", sparkColor: "#7C3AED", spark: [1, 1, 2, 2, 3, 3, 3] },
@@ -146,11 +148,11 @@ export default function Dashboard() {
             {annLoading && (
               <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>로딩 중…</span>
             )}
-            {!annLoading && totalCount > 0 && (
+            {!annLoading && matchCount > 0 && (
               <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>
                 {filter === "전체"
-                  ? `전체 ${totalCount.toLocaleString()}건`
-                  : `${filteredCount}건 / 전체 ${totalCount.toLocaleString()}건`}
+                  ? `전체 ${matchCount.toLocaleString()}건`
+                  : `${filteredCount}건 / 전체 ${matchCount.toLocaleString()}건`}
               </span>
             )}
           </div>
@@ -225,7 +227,7 @@ export default function Dashboard() {
                 <Card title="공급 유형 구성" sub="주택구분 기준 (참고용)">
                   <Donut
                     data={SUPPLY_TYPES}
-                    centerValue={totalCount ? String(totalCount > 9999 ? "9999+" : totalCount) : "…"}
+                    centerValue={matchCount ? String(matchCount > 9999 ? "9999+" : matchCount) : "…"}
                     centerLabel="공고건"
                   />
                   <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--bg)", borderRadius: 10 }}>
