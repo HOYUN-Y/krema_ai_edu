@@ -1,57 +1,63 @@
-import { XMLParser } from "fast-xml-parser";
+const BASE_URL = "https://api.odcloud.kr/api";
+const SERVICE_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
-const parser = new XMLParser({ ignoreAttributes: false, parseTagValue: true });
-
-const BASE_URL = "https://apis.data.go.kr";
-const SERVICE_KEY = process.env.API_SERVICE_KEY ?? "";
-
-function parseXml(xml: string) {
-  return parser.parse(xml);
-}
-
-async function fetchApi(path: string, params: Record<string, string>) {
+async function fetchApi(path: string, params: Record<string, string> = {}) {
   const qs = new URLSearchParams({
     serviceKey: SERVICE_KEY,
-    numOfRows: "20",
-    pageNo: "1",
+    page: "1",
+    perPage: "20",
     ...params,
   });
   const url = `${BASE_URL}${path}?${qs.toString()}`;
   const res = await fetch(url, { next: { revalidate: 3600 } });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
-  const text = await res.text();
-  return parseXml(text);
+  return res.json();
 }
 
-// 분양정보 조회 (APT 분양 공고)
-export async function getAnnouncements(pageNo = "1") {
-  const data = await fetchApi(
-    "/B551408/RTHC_BldgMngtR/getAPTLttotPblancMaster",
-    { pageNo, numOfRows: "20" }
-  );
-  const items = data?.response?.body?.items?.item ?? [];
+// 분양정보 조회 - APT 분양 공고 목록
+export async function getAnnouncements(page = "1") {
+  const data = await fetchApi("/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail", {
+    page,
+    perPage: "20",
+  });
   return {
-    totalCount: data?.response?.body?.totalCount ?? 0,
-    items: Array.isArray(items) ? items : [items],
+    totalCount: data?.totalCount ?? 0,
+    items: data?.data ?? [],
   };
 }
 
-// 청약 경쟁률 및 특별공급 신청현황
-export async function getCompetition(houseManageNo: string) {
-  const data = await fetchApi(
-    "/B551408/RTHC_BldgMngtR/getAPTLttotPblancDetail",
-    { houseManageNo }
-  );
-  const items = data?.response?.body?.items?.item ?? [];
-  return Array.isArray(items) ? items : [items];
+// 청약 경쟁률 - APT 경쟁률
+export async function getCompetition(page = "1") {
+  const data = await fetchApi("/ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancCmpet", {
+    page,
+    perPage: "20",
+  });
+  return {
+    totalCount: data?.totalCount ?? 0,
+    items: data?.data ?? [],
+  };
 }
 
-// 청약 신청·당첨자 정보
-export async function getApplicants(houseManageNo: string) {
-  const data = await fetchApi(
-    "/B551408/RTHC_BldgMngtR/getAPTLttotWinnerListInfo",
-    { houseManageNo }
-  );
-  const items = data?.response?.body?.items?.item ?? [];
-  return Array.isArray(items) ? items : [items];
+// 특별공급 신청현황
+export async function getSpecialSupply(page = "1") {
+  const data = await fetchApi("/ApplyhomeInfoCmpetRtSvc/v1/getAPTSpsplyReqstStus", {
+    page,
+    perPage: "20",
+  });
+  return {
+    totalCount: data?.totalCount ?? 0,
+    items: data?.data ?? [],
+  };
+}
+
+// 청약 신청·당첨자 통계 - 지역별
+export async function getApplicantAreaStat(page = "1") {
+  const data = await fetchApi("/ApplyhomeStatSvc/v1/getAPTReqstAreaStat", {
+    page,
+    perPage: "20",
+  });
+  return {
+    totalCount: data?.totalCount ?? 0,
+    items: data?.data ?? [],
+  };
 }
