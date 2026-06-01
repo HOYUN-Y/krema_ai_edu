@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApplicants } from "@/lib/api";
+import { getReqstAreaStat, getPrzwnerAreaStat } from "@/lib/api";
 
 export async function GET(req: NextRequest) {
   try {
-    const id = req.nextUrl.searchParams.get("id") ?? "";
-    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-    const data = await getApplicants(id);
-    return NextResponse.json(data);
+    const page = req.nextUrl.searchParams.get("page") ?? "1";
+    const [reqst, przwner] = await Promise.all([
+      getReqstAreaStat(page),
+      getPrzwnerAreaStat(page),
+    ]);
+    return NextResponse.json({ reqst, przwner });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

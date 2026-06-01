@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCompetition } from "@/lib/api";
+import { getAPTCompetition, getSpecialSupply } from "@/lib/api";
 
 export async function GET(req: NextRequest) {
   try {
-    const id = req.nextUrl.searchParams.get("id") ?? "";
-    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-    const data = await getCompetition(id);
-    return NextResponse.json(data);
+    const page = req.nextUrl.searchParams.get("page") ?? "1";
+    const houseManageNo = req.nextUrl.searchParams.get("id") ?? undefined;
+    const [competition, special] = await Promise.all([
+      getAPTCompetition(page, houseManageNo),
+      getSpecialSupply(page),
+    ]);
+    return NextResponse.json({ competition, special });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
