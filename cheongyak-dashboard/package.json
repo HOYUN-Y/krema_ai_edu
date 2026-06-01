@@ -9,7 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.67",
+    "@ai-sdk/react": "^3.0.195",
     "@libsql/client": "^0.17.3",
+    "ai": "^6.0.193",
     "clsx": "^2.1.1",
     "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.6",
@@ -20,7 +23,8 @@
     "react-dom": "^18",
     "recharts": "^2.12.7",
     "swr": "^2.2.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20",
