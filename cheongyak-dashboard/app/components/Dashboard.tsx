@@ -4,10 +4,15 @@ import { useState } from "react";
 import useSWR from "swr";
 import { Card, KpiCard, Logo, Chip, StatusPill, heatColor, fmt } from "./ui";
 import { HBarRank, AreaLine, Donut } from "./charts";
+import CompetitionPage from "./pages/CompetitionPage";
+import RegionPage from "./pages/RegionPage";
+import SchedulePage from "./pages/SchedulePage";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-const NAV = [
+type NavKey = "대시보드" | "경쟁률 분석" | "분양가·시세" | "지역 현황" | "청약 일정";
+
+const NAV: [string, NavKey, boolean][] = [
   ["◧", "대시보드", true],
   ["▦", "경쟁률 분석", false],
   ["⇅", "분양가·시세", false],
@@ -25,6 +30,7 @@ const SUPPLY_TYPES = [
 type Item = Record<string, string | number>;
 
 export default function Dashboard() {
+  const [activePage, setActivePage] = useState<NavKey>("대시보드");
   const [filter, setFilter] = useState("전체");
 
   const { data: annData } = useSWR("/api/announcements?page=1", fetcher);
@@ -86,16 +92,24 @@ export default function Dashboard() {
           <Logo />
         </div>
         <nav style={{ padding: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV.map(([ic, label, active], i) => (
-            <div key={i} style={{
-              display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9, cursor: "pointer",
-              background: active ? "#EFF6FF" : "transparent",
-              color: active ? "#1D4ED8" : "var(--muted)",
-              fontWeight: active ? 700 : 600, fontSize: 13.5,
-            }}>
-              <span style={{ fontSize: 15, width: 18, textAlign: "center" }}>{ic}</span>{label}
-            </div>
-          ))}
+          {NAV.map(([ic, label], i) => {
+            const isActive = activePage === label;
+            const disabled = label === "분양가·시세";
+            return (
+              <div key={i} onClick={() => !disabled && setActivePage(label as NavKey)} style={{
+                display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9,
+                cursor: disabled ? "not-allowed" : "pointer",
+                background: isActive ? "#EFF6FF" : "transparent",
+                color: disabled ? "#CBD5E1" : isActive ? "#1D4ED8" : "var(--muted)",
+                fontWeight: isActive ? 700 : 600, fontSize: 13.5,
+                userSelect: "none",
+              }}>
+                <span style={{ fontSize: 15, width: 18, textAlign: "center" }}>{ic}</span>
+                <span>{label}</span>
+                {disabled && <span style={{ fontSize: 9, marginLeft: "auto", background: "#F1F5F9", color: "#94A3B8", padding: "1px 5px", borderRadius: 4 }}>준비중</span>}
+              </div>
+            );
+          })}
         </nav>
         <div style={{ marginTop: "auto", padding: 14, borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#1E293B", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>청</div>
@@ -128,85 +142,92 @@ export default function Dashboard() {
         </header>
 
         <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 18 }}>
-          {/* KPI strip */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
-            {kpis.map((k) => <KpiCard key={k.label} {...k} />)}
-          </div>
-
-          {/* Row 2: 경쟁률 랭킹 + 추이 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 18 }}>
-            <Card title="경쟁률 TOP 8" sub="공고번호별 1순위 최고 경쟁률 · 색상 = 과열 정도">
-              {ranked.length > 0
-                ? <HBarRank data={ranked} labelKey="name" subKey="area" valueKey="rate" />
-                : <div style={{ height: 200, background: "var(--track)", borderRadius: 8, animation: "pulse 1.5s ease-in-out infinite" }} />}
-            </Card>
-            <Card title="월별 신청 추이" sub="지역별 연령대 신청건수 합계">
-              {trend.length > 0
-                ? <AreaLine data={trend} valueKey="rate" color="#2563EB" />
-                : <div style={{ height: 180, background: "var(--track)", borderRadius: 8 }} />}
-            </Card>
-          </div>
-
-          {/* Row 3: 분양 공고 테이블 + 공급유형 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18 }}>
-            <Card title="청약 일정" sub="분양 공고 목록 (최신순)">
-              <div style={{ display: "grid", gridTemplateColumns: "90px 1.4fr 1fr 0.8fr 0.8fr 90px", gap: 0, fontSize: 12.5 }}>
-                <div style={{ display: "contents" }}>
-                  {["접수시작일", "단지명", "공급지역", "주택형", "공급세대", "상태"].map((h, i) => (
-                    <div key={i} style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", padding: "0 8px 10px", borderBottom: "1px solid var(--line)" }}>{h}</div>
-                  ))}
-                </div>
-                {announcements.length === 0
-                  ? <div style={{ gridColumn: "1/-1", padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>데이터 로딩 중…</div>
-                  : announcements.slice(0, 8).map((c, i) => {
-                    const startDate = String(c.GNRL_RNK1_CRSPAREA_RCPTDE ?? "-");
-                    const isOpen = startDate !== "-" && new Date(startDate) <= new Date();
-                    const status = isOpen ? "접수중" : "접수예정";
-                    return (
-                      <div key={i} style={{ display: "contents" }}>
-                        <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", fontWeight: 700, color: "#1D4ED8", fontVariantNumeric: "tabular-nums" }}>
-                          {startDate !== "-" ? startDate.slice(5).replace("-", ".") : "-"}
-                        </div>
-                        <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {String(c.HOUSE_NM ?? "-")}
-                        </div>
-                        <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
-                          {String(c.SUBSCRPT_AREA_CODE_NM ?? "-")}
-                        </div>
-                        <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
-                          {String(c.HOUSE_DTL_SECD_NM ?? "-")}
-                        </div>
-                        <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", fontVariantNumeric: "tabular-nums" }}>
-                          {c.TOT_SUPLY_HSHLDCO ? fmt(Number(c.TOT_SUPLY_HSHLDCO)) : "-"}
-                        </div>
-                        <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)" }}>
-                          <StatusPill status={status} />
-                        </div>
-                      </div>
-                    );
-                  })}
+          {activePage === "경쟁률 분석" && <CompetitionPage />}
+          {activePage === "지역 현황" && <RegionPage />}
+          {activePage === "청약 일정" && <SchedulePage />}
+          {activePage === "대시보드" && (
+            <>
+              {/* KPI strip */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
+                {kpis.map((k) => <KpiCard key={k.label} {...k} />)}
               </div>
-            </Card>
 
-            <Card title="공급 유형 구성" sub="주택구분 기준 (참고용)">
-              <Donut
-                data={SUPPLY_TYPES}
-                centerValue={totalCount ? String(totalCount > 9999 ? "9999+" : totalCount) : "…"}
-                centerLabel="공고건"
-              />
-              <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--bg)", borderRadius: 10 }}>
-                <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600, marginBottom: 6 }}>지역별 신청 현황 (최근)</div>
-                {statItems.slice(0, 5).map((item, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: i < 4 ? "1px solid var(--line)" : "none" }}>
-                    <span style={{ fontWeight: 600 }}>{String(item.SUBSCRPT_AREA_CODE_NM ?? "-")}</span>
-                    <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
-                      {(Number(item.AGE_30) + Number(item.AGE_40) + Number(item.AGE_50) + Number(item.AGE_60)).toLocaleString()}건
-                    </span>
+              {/* Row 2: 경쟁률 랭킹 + 추이 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 18 }}>
+                <Card title="경쟁률 TOP 8" sub="공고번호별 1순위 최고 경쟁률 · 색상 = 과열 정도">
+                  {ranked.length > 0
+                    ? <HBarRank data={ranked} labelKey="name" subKey="area" valueKey="rate" />
+                    : <div style={{ height: 200, background: "var(--track)", borderRadius: 8, animation: "pulse 1.5s ease-in-out infinite" }} />}
+                </Card>
+                <Card title="월별 신청 추이" sub="지역별 연령대 신청건수 합계">
+                  {trend.length > 0
+                    ? <AreaLine data={trend} valueKey="rate" color="#2563EB" />
+                    : <div style={{ height: 180, background: "var(--track)", borderRadius: 8 }} />}
+                </Card>
+              </div>
+
+              {/* Row 3: 분양 공고 테이블 + 공급유형 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18 }}>
+                <Card title="청약 일정" sub="분양 공고 목록 (최신순)">
+                  <div style={{ display: "grid", gridTemplateColumns: "90px 1.4fr 1fr 0.8fr 0.8fr 90px", gap: 0, fontSize: 12.5 }}>
+                    <div style={{ display: "contents" }}>
+                      {["접수시작일", "단지명", "공급지역", "주택형", "공급세대", "상태"].map((h, i) => (
+                        <div key={i} style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", padding: "0 8px 10px", borderBottom: "1px solid var(--line)" }}>{h}</div>
+                      ))}
+                    </div>
+                    {announcements.length === 0
+                      ? <div style={{ gridColumn: "1/-1", padding: "24px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>데이터 로딩 중…</div>
+                      : announcements.slice(0, 8).map((c, i) => {
+                        const startDate = String(c.GNRL_RNK1_CRSPAREA_RCPTDE ?? "-");
+                        const isOpen = startDate !== "-" && new Date(startDate) <= new Date();
+                        const status = isOpen ? "접수중" : "접수예정";
+                        return (
+                          <div key={i} style={{ display: "contents" }}>
+                            <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", fontWeight: 700, color: "#1D4ED8", fontVariantNumeric: "tabular-nums" }}>
+                              {startDate !== "-" ? startDate.slice(5).replace("-", ".") : "-"}
+                            </div>
+                            <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {String(c.HOUSE_NM ?? "-")}
+                            </div>
+                            <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
+                              {String(c.SUBSCRPT_AREA_CODE_NM ?? "-")}
+                            </div>
+                            <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", color: "var(--muted)" }}>
+                              {String(c.HOUSE_DTL_SECD_NM ?? "-")}
+                            </div>
+                            <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)", fontVariantNumeric: "tabular-nums" }}>
+                              {c.TOT_SUPLY_HSHLDCO ? fmt(Number(c.TOT_SUPLY_HSHLDCO)) : "-"}
+                            </div>
+                            <div style={{ padding: "12px 8px", borderBottom: "1px solid var(--line)" }}>
+                              <StatusPill status={status} />
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
-                ))}
+                </Card>
+
+                <Card title="공급 유형 구성" sub="주택구분 기준 (참고용)">
+                  <Donut
+                    data={SUPPLY_TYPES}
+                    centerValue={totalCount ? String(totalCount > 9999 ? "9999+" : totalCount) : "…"}
+                    centerLabel="공고건"
+                  />
+                  <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--bg)", borderRadius: 10 }}>
+                    <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600, marginBottom: 6 }}>지역별 신청 현황 (최근)</div>
+                    {statItems.slice(0, 5).map((item, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: i < 4 ? "1px solid var(--line)" : "none" }}>
+                        <span style={{ fontWeight: 600 }}>{String(item.SUBSCRPT_AREA_CODE_NM ?? "-")}</span>
+                        <span style={{ color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+                          {(Number(item.AGE_30) + Number(item.AGE_40) + Number(item.AGE_50) + Number(item.AGE_60)).toLocaleString()}건
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
               </div>
-            </Card>
-          </div>
+            </>
+          )}
         </div>
 
         <footer style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", padding: "16px 0 24px", borderTop: "1px solid var(--line)", marginTop: 8 }}>
