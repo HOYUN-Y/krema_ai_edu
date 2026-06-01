@@ -10,10 +10,11 @@ import LineChart from "./charts/LineChart";
 import CompetitionPage from "./pages/CompetitionPage";
 import RegionPage from "./pages/RegionPage";
 import SchedulePage from "./pages/SchedulePage";
+import DataLabPage from "./pages/DataLabPage";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-type NavKey = "대시보드" | "경쟁률 분석" | "분양가·시세" | "지역 현황" | "청약 일정";
+type NavKey = "대시보드" | "경쟁률 분석" | "분양가·시세" | "지역 현황" | "청약 일정" | "데이터랩";
 
 const NAV: [string, NavKey, boolean][] = [
   ["◧", "대시보드", true],
@@ -21,6 +22,7 @@ const NAV: [string, NavKey, boolean][] = [
   ["⇅", "분양가·시세", false],
   ["◉", "지역 현황", false],
   ["▤", "청약 일정", false],
+  ["⬇", "데이터랩", false],
 ];
 
 const SUPPLY_TYPES = [
@@ -36,7 +38,7 @@ export default function Dashboard() {
   // nuqs: URL ↔ 상태 동기화 (뒤로가기·공유·북마크 지원)
   const [activePage, setActivePage] = useQueryState(
     "page",
-    parseAsStringEnum<NavKey>(["대시보드", "경쟁률 분석", "분양가·시세", "지역 현황", "청약 일정"])
+    parseAsStringEnum<NavKey>(["대시보드", "경쟁률 분석", "분양가·시세", "지역 현황", "청약 일정", "데이터랩"])
       .withDefault("대시보드")
   );
   const [filter, setFilter] = useQueryState(
@@ -113,18 +115,25 @@ export default function Dashboard() {
           {NAV.map(([ic, label], i) => {
             const isActive = activePage === label;
             const disabled = label === "분양가·시세";
+            const isDataLab = label === "데이터랩";
             return (
-              <div key={i} onClick={() => !disabled && setActivePage(label as NavKey)} style={{
-                display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9,
-                cursor: disabled ? "not-allowed" : "pointer",
-                background: isActive ? "#EFF6FF" : "transparent",
-                color: disabled ? "#CBD5E1" : isActive ? "#1D4ED8" : "var(--muted)",
-                fontWeight: isActive ? 700 : 600, fontSize: 13.5,
-                userSelect: "none",
-              }}>
-                <span style={{ fontSize: 15, width: 18, textAlign: "center" }}>{ic}</span>
-                <span>{label}</span>
-                {disabled && <span style={{ fontSize: 9, marginLeft: "auto", background: "#F1F5F9", color: "#94A3B8", padding: "1px 5px", borderRadius: 4 }}>준비중</span>}
+              <div key={i}>
+                {isDataLab && (
+                  <div style={{ height: 1, background: "var(--line)", margin: "8px 4px", borderRadius: 1 }} />
+                )}
+                <div onClick={() => !disabled && setActivePage(label as NavKey)} style={{
+                  display: "flex", alignItems: "center", gap: 11, padding: "10px 12px", borderRadius: 9,
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  background: isActive ? (isDataLab ? "#F0FDF4" : "#EFF6FF") : "transparent",
+                  color: disabled ? "#CBD5E1" : isActive ? (isDataLab ? "#15803D" : "#1D4ED8") : "var(--muted)",
+                  fontWeight: isActive ? 700 : 600, fontSize: 13.5,
+                  userSelect: "none",
+                }}>
+                  <span style={{ fontSize: 15, width: 18, textAlign: "center" }}>{ic}</span>
+                  <span>{label}</span>
+                  {disabled && <span style={{ fontSize: 9, marginLeft: "auto", background: "#F1F5F9", color: "#94A3B8", padding: "1px 5px", borderRadius: 4 }}>준비중</span>}
+                  {isDataLab && !isActive && <span style={{ fontSize: 9, marginLeft: "auto", background: "#DCFCE7", color: "#15803D", padding: "1px 5px", borderRadius: 4 }}>NEW</span>}
+                </div>
               </div>
             );
           })}
@@ -173,6 +182,7 @@ export default function Dashboard() {
           {activePage === "경쟁률 분석" && <CompetitionPage />}
           {activePage === "지역 현황" && <RegionPage />}
           {activePage === "청약 일정" && <SchedulePage />}
+          {activePage === "데이터랩" && <DataLabPage />}
           {activePage === "대시보드" && (
             <>
               {/* KPI strip */}
