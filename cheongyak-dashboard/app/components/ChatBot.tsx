@@ -1,27 +1,15 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { HttpChatTransport } from "ai";
+import { useChat } from "ai/react";
 import { useState, useRef, useEffect } from "react";
 
 export default function ChatBot() {
   const [open, setOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chat = useChat({
-    chat: new (HttpChatTransport as any)({ api: "/api/chat" }),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any) as any;
-
-  const messages: { id: string; role: string; content: string }[] = chat.messages ?? [];
-  const status: string = chat.status ?? "idle";
-  const error: Error | undefined = chat.error;
-  const input: string = chat.input ?? "";
-  const handleInputChange = chat.handleInputChange;
-  const handleSubmit = chat.handleSubmit;
-
-  const isLoading = status === "streaming" || status === "submitted";
+  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
+    api: "/api/chat",
+  });
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });

@@ -1,5 +1,5 @@
 import { openai } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { streamText, tool } from "ai";
 import { z } from "zod";
 import { db, initSchema } from "@/lib/db";
 
@@ -42,58 +42,11 @@ const DB_SCHEMA = `
    - age_30, age_40, age_50, age_60: 연령대별 당첨건수
 `;
 
-async function runQuery(sql: string) {
-  if (!sql.trim().toUpperCase().startsWith("SELECT")) {
-    return { error: "SELECT 쿼리만 허용됩니다." };
-  }
-  try {
-    const result = await db.execute(sql);
-    return {
-      rowCount: result.rows.length,
-      rows: result.rows.slice(0, 20),
-      truncated: result.rows.length > 20,
-    };
-  } catch (e) {
-    return { error: `쿼리 오류: ${String(e)}` };
-  }
-}
-
-async function getStats() {
-  const r = await db.execute(`
-    SELECT
-      (SELECT COUNT(*) FROM apt_announcements) as 분양공고수,
-      (SELECT COUNT(*) FROM apt_competitions)  as 경쟁률데이터수,
-      (SELECT COUNT(*) FROM reqst_area_stats)  as 신청자통계수,
-      (SELECT COUNT(*) FROM przwner_area_stats) as 당첨자통계수,
-      (SELECT MAX(stat_de) FROM reqst_area_stats) as 최신통계월,
-      (SELECT COUNT(DISTINCT sido) FROM apt_announcements) as 지역수
-  `);
-  return r.rows[0];
-}
-
 export async function POST(req: Request) {
   const { messages } = await req.json();
   await initSchema();
 
-  // AI SDK v5 호환: tools를 any로 캐스팅
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tools: any = {
-    queryDatabase: {
-      description: "청약 DB에 SQL SELECT 쿼리를 실행합니다.",
-      parameters: z.object({
-        sql: z.string().describe("실행할 SELECT SQL 쿼리"),
-        description: z.string().describe("이 쿼리가 조회하는 내용"),
-      }),
-      execute: async ({ sql }: { sql: string; description: string }) => runQuery(sql),
-    },
-    getDbStats: {
-      description: "현재 DB에 저장된 데이터 현황을 조회합니다.",
-      parameters: z.object({}),
-      execute: async () => getStats(),
-    },
-  };
-
-  const result = streamText({
+  const result = await streamText({
     model: openai("gpt-3.5-turbo"),
     system: `당신은 한국 청약 시장 전문 분석 AI 어시스턴트입니다.
 사용자의 질문을 이해하고, 필요하면 도구를 사용해 DB를 조회한 후 정확한 데이터를 기반으로 답변하세요.
@@ -104,9 +57,52 @@ ${DB_SCHEMA}
 - 항상 한국어로 답변하세요
 - 데이터 수치를 정확히 인용하고 표/목록으로 정리하세요
 - 데이터가 없으면 솔직하게 말하세요`,
+
     messages,
-    tools,
+    maxSteps: 3,
+
+    tools: {
+      queryDatabase: tool({
+        description: "청약 DB에 SQL SELECT 쿼리를 실행합니다.",
+        parameters: z.object({
+          sql: z.string().describe("실행할 SELECT SQL 쿼리"),
+          description: z.string().describe("이 쿼리가 조회하는 내용"),
+        }),
+        execute: async ({ sql }) => {
+          if (!sql.trim().toUpperCase().startsWith("SELECT")) {
+            return { error: "SELECT 쿼리만 허용됩니다." };
+          }
+          try {
+            const result = await db.execute(sql);
+            return {
+              rowCount: result.rows.length,
+              rows: result.rows.slice(0, 20),
+              truncated: result.rows.length > 20,
+            };
+          } catch (e) {
+            return { error: `쿼리 오류: ${String(e)}` };
+          }
+        },
+      }),
+
+      getDbStats: tool({
+        description: "현재 DB에 저장된 데이터 현황을 조회합니다.",
+        parameters: z.object({}),
+        execute: async () => {
+          const r = await db.execute(`
+            SELECT
+              (SELECT COUNT(*) FROM apt_announcements) as 분양공고수,
+              (SELECT COUNT(*) FROM apt_competitions)  as 경쟁률데이터수,
+              (SELECT COUNT(*) FROM reqst_area_stats)  as 신청자통계수,
+              (SELECT COUNT(*) FROM przwner_area_stats) as 당첨자통계수,
+              (SELECT MAX(stat_de) FROM reqst_area_stats) as 최신통계월,
+              (SELECT COUNT(DISTINCT sido) FROM apt_announcements) as 지역수
+          `);
+          return r.rows[0];
+        },
+      }),
+    },
   });
 
-  return result.toTextStreamResponse();
+  return result.toDataStreamResponse();
 }
