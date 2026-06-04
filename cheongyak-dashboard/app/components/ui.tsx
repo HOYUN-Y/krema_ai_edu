@@ -59,10 +59,10 @@ export function KpiCard({ label, value, unit, delta, sub, spark, sparkColor }: {
       <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>{label}</div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 8 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
-          <span style={{ fontSize: 27, fontWeight: 800, color: "var(--ink)", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>{value}</span>
+          <span className="kpi-value" style={{ fontSize: 27, fontWeight: 800, color: "var(--ink)", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>{value}</span>
           <span style={{ fontSize: 13, color: "var(--muted)", fontWeight: 600 }}>{unit}</span>
         </div>
-        {spark && <Sparkline data={spark} color={sparkColor || "#2563EB"} />}
+        {spark && <span className="kpi-spark"><Sparkline data={spark} color={sparkColor || "#2563EB"} /></span>}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
         <Delta value={delta} invert={label.includes("분양가율")} />

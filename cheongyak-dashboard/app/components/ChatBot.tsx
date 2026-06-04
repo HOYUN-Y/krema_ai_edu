@@ -34,8 +34,10 @@ export default function ChatBot() {
     <>
       {open && (
         <div style={{
-          position: "fixed", bottom: 88, right: 24, zIndex: 1000,
-          width: 380, height: 560,
+          position: "fixed", zIndex: 1000,
+          bottom: "clamp(80px, 10vh, 88px)", right: "clamp(8px, 4vw, 24px)",
+          width: "min(380px, calc(100vw - 16px))",
+          height: "min(560px, calc(100dvh - 140px))",
           background: "var(--surface)", border: "1px solid var(--line)",
           borderRadius: 18, boxShadow: "0 8px 40px rgba(15,23,42,.18)",
           display: "flex", flexDirection: "column", overflow: "hidden",
@@ -129,7 +131,7 @@ export default function ChatBot() {
       )}
 
       {/* 플로팅 버튼 */}
-      <button onClick={() => setOpen(v => !v)} style={{
+      <button onClick={() => setOpen(v => !v)} className="chatbot-fab" style={{
         position: "fixed", bottom: 24, right: 24, zIndex: 1000,
         width: 56, height: 56, borderRadius: "50%",
         background: "linear-gradient(135deg, #2563EB, #1D4ED8)",

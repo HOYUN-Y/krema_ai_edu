@@ -25,3 +25,112 @@ html, body {
   background: var(--bg);
   color: var(--ink);
 }
+
+/* ── 모바일 레이아웃 ────────────────────────────────────────── */
+.dash-layout { display: flex; width: 100%; min-height: 100vh; }
+
+/* 사이드바: 데스크톱 */
+.dash-sidebar {
+  width: 224px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 20;
+}
+
+/* 하단 탭바: 모바일 전용 (기본 숨김) */
+.dash-bottom-nav {
+  display: none;
+}
+
+/* KPI 그리드 */
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+/* 2열 그리드 */
+.two-col-wide { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; }
+.two-col      { display: grid; grid-template-columns: 1.6fr 1fr;  gap: 18px; }
+
+/* 메인 패딩 */
+.dash-main-pad { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+
+/* 상단 헤더 필터 영역 */
+.topbar-right { display: flex; align-items: center; gap: 8px; }
+
+@media (max-width: 768px) {
+  /* 사이드바 숨기고 하단 탭바로 교체 */
+  .dash-sidebar { display: none; }
+
+  .dash-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    z-index: 50;
+    box-shadow: 0 -2px 12px rgba(15,23,42,.08);
+  }
+  .dash-bottom-nav button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 6px 2px;
+    font-family: var(--sans);
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--muted);
+    transition: color .15s;
+  }
+  .dash-bottom-nav button.active { color: #1D4ED8; }
+  .dash-bottom-nav button .nav-icon { font-size: 16px; line-height: 1; }
+
+  /* KPI 2×2 */
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+  /* 2열 → 1열 */
+  .two-col-wide, .two-col { grid-template-columns: 1fr; }
+
+  /* 메인 패딩 줄이기 + 하단 탭바 공간 확보 */
+  .dash-main-pad { padding: 14px 12px 80px; gap: 12px; }
+
+  /* 상단 헤더 */
+  .dash-topbar {
+    height: auto !important;
+    padding: 10px 14px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .topbar-right { flex-wrap: wrap; gap: 6px; }
+  .topbar-title { font-size: 15px !important; }
+  .topbar-sub   { font-size: 10px !important; }
+
+  /* 청약 일정 테이블 폰트 */
+  .schedule-table { font-size: 11px !important; }
+  .schedule-table th, .schedule-table td { padding: 8px 6px !important; }
+
+  /* 달력 셀 최소 높이 축소 */
+  .cal-cell { min-height: 40px !important; }
+
+  /* 챗봇 FAB: 하단 탭바 위로 */
+  .chatbot-fab { bottom: 72px !important; }
+
+  /* KPI 카드: 스파크라인 숨기기, 폰트 축소 */
+  .kpi-spark { display: none !important; }
+  .kpi-value { font-size: 22px !important; }
+
+  /* 대시보드 청약일정 테이블 컬럼 줄바꿈 방지 */
+  .dash-schedule-grid { overflow-x: auto; }
+  .dash-schedule-grid > div { white-space: nowrap; }
+}

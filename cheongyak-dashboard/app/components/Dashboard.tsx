@@ -105,9 +105,9 @@ export default function Dashboard() {
   ];
 
   return (
-    <div style={{ display: "flex", width: "100%", minHeight: "100vh", background: "var(--bg)", fontFamily: "var(--sans)", color: "var(--ink)" }}>
-      {/* Sidebar */}
-      <aside style={{ width: 224, background: "var(--surface)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
+    <div className="dash-layout" style={{ background: "var(--bg)", fontFamily: "var(--sans)", color: "var(--ink)" }}>
+      {/* Sidebar (데스크톱) */}
+      <aside className="dash-sidebar">
         <div style={{ padding: "20px 18px", borderBottom: "1px solid var(--line)" }}>
           <Logo />
         </div>
@@ -150,18 +150,18 @@ export default function Dashboard() {
       {/* Main */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Topbar */}
-        <header style={{
+        <header className="dash-topbar" style={{
           height: 64, background: "var(--surface)", borderBottom: "1px solid var(--line)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "0 24px", flexShrink: 0, position: "sticky", top: 0, zIndex: 10,
         }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>전국 청약 현황 대시보드</div>
-            <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
+            <div className="topbar-title" style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>전국 청약 현황 대시보드</div>
+            <div className="topbar-sub" style={{ fontSize: 11.5, color: "var(--muted)" }}>
               {new Date().getFullYear()}년 {new Date().getMonth() + 1}월 · 한국부동산원 청약홈 API
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="topbar-right">
             {(["전체", "수도권", "민영"] as const).map((label) => (
               <Chip key={label} label={label} active={filter === label} onClick={() => setFilter(label)} />
             ))}
@@ -178,7 +178,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="dash-main-pad">
           {activePage === "경쟁률 분석" && <CompetitionPage />}
           {activePage === "지역 현황" && <RegionPage />}
           {activePage === "청약 일정" && <SchedulePage />}
@@ -186,12 +186,12 @@ export default function Dashboard() {
           {activePage === "대시보드" && (
             <>
               {/* KPI strip */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
+              <div className="kpi-grid">
                 {kpis.map((k) => <KpiCard key={k.label} {...k} />)}
               </div>
 
               {/* Row 2: 경쟁률 랭킹 + 추이 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 18 }}>
+              <div className="two-col-wide">
                 <Card title="경쟁률 TOP 8" sub="공고번호별 1순위 최고 경쟁률 · 색상 = 과열 정도">
                   <Suspense fallback={<div style={{ height: 240, background: "var(--track)", borderRadius: 8 }} />}>
                     <BarChart
@@ -215,9 +215,10 @@ export default function Dashboard() {
               </div>
 
               {/* Row 3: 분양 공고 테이블 + 공급유형 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 18 }}>
+              <div className="two-col">
                 <Card title="청약 일정" sub="분양 공고 목록 (최신순)">
-                  <div style={{ display: "grid", gridTemplateColumns: "90px 1.4fr 1fr 0.8fr 0.8fr 90px", gap: 0, fontSize: 12.5 }}>
+                  <div className="dash-schedule-grid" style={{ overflowX: "auto" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "90px 1.4fr 1fr 0.8fr 0.8fr 90px", gap: 0, fontSize: 12.5, minWidth: 420 }}>
                     <div style={{ display: "contents" }}>
                       {["접수시작일", "단지명", "공급지역", "주택형", "공급세대", "상태"].map((h, i) => (
                         <div key={i} style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", padding: "0 8px 10px", borderBottom: "1px solid var(--line)" }}>{h}</div>
@@ -253,6 +254,7 @@ export default function Dashboard() {
                         );
                       })}
                   </div>
+                  </div>
                 </Card>
 
                 <Card title="공급 유형 구성" sub="주택구분 기준 (참고용)">
@@ -285,6 +287,23 @@ export default function Dashboard() {
           데이터 출처: 공공데이터포털 · 한국부동산원 청약홈 API
         </footer>
       </main>
+
+      {/* 하단 탭바 (모바일 전용) */}
+      <nav className="dash-bottom-nav">
+        {NAV.filter(([, label]) => label !== "분양가·시세").map(([ic, label]) => {
+          const isActive = activePage === label;
+          return (
+            <button
+              key={label}
+              className={isActive ? "active" : ""}
+              onClick={() => setActivePage(label as NavKey)}
+            >
+              <span className="nav-icon">{ic}</span>
+              <span>{label === "경쟁률 분석" ? "경쟁률" : label === "지역 현황" ? "지역" : label === "청약 일정" ? "일정" : label === "데이터랩" ? "데이터" : label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

@@ -101,7 +101,7 @@ export default function SchedulePage() {
             const evs = d ? (byDay[d] || []) : [];
             const has = evs.length > 0;
             return (
-              <div key={i} style={{
+              <div key={i} className="cal-cell" style={{
                 minHeight: 56, borderRadius: 8, padding: "4px 6px",
                 background: has ? "#EFF6FF" : "var(--bg)",
                 border: `1px solid ${has ? "#BFDBFE" : "transparent"}`,
@@ -150,7 +150,7 @@ export default function SchedulePage() {
           ? <div style={{ height: 200, background: "var(--track)", borderRadius: 8, animation: "pulse 1.5s ease-in-out infinite" }} />
           : (
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", fontSize: 12.5, borderCollapse: "collapse" }}>
+              <table className="schedule-table" style={{ width: "100%", fontSize: 12.5, borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
                     {["단지명", "공급지역", "주택형", "공급세대", "1순위 접수일", "1순위 마감일", "당첨발표일", "상태"].map(h => (
